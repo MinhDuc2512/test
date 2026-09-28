@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Tra Cứu & Theo Dõi Vận Đơn (ExpressTrack Logistics)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Be Vietnam Pro', 'sans-serif'] },
+                    colors: { brand: { 50: '#eff6ff', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8' } }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen flex flex-col">
+
+    <!-- Header Navigation -->
+    <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('tracking')">
+                <div class="bg-blue-600 p-2 rounded-lg text-white">
+                    <i class="fa-solid fa-truck-fast text-xl"></i>
+                </div>
+                <div>
+                    <span class="text-xl font-bold tracking-tight text-white">Express<span class="text-blue-500">Track</span></span>
+                    <span class="text-xs text-slate-400 block -mt-1">Logistics & Tracking System</span>
+                </div>
+            </div>
+
+            <!-- Main Tabs Nav -->
+            <nav class="hidden md:flex space-x-1 text-sm font-medium">
+                <button onclick="switchTab('tracking')" id="nav-tracking" class="px-4 py-2 rounded-md transition flex items-center space-x-2 bg-blue-600 text-white">
+                    <i class="fa-solid fa-magnifying-glass"></i><span>Tra Cứu Vận Đơn</span>
+                </button>
+                <button onclick="switchTab('orders')" id="nav-orders" class="px-4 py-2 rounded-md transition flex items-center space-x-2 text-slate-300 hover:text-white hover:bg-slate-800">
+                    <i class="fa-solid fa-box font-medium"></i><span>Tạo & Quản Lý Đơn</span>
+                </button>
+                <button onclick="switchTab('shipper')" id="nav-shipper" class="px-4 py-2 rounded-md transition flex items-center space-x-2 text-slate-300 hover:text-white hover:bg-slate-800">
+                    <i class="fa-solid fa-[#000] fa-qrcode"></i><span>Cập Nhật Trạng Thái (Kho/Shipper)</span>
+                </button>
+                <button onclick="switchTab('master')" id="nav-master" class="px-4 py-2 rounded-md transition flex items-center space-x-2 text-slate-300 hover:text-white hover:bg-slate-800">
+                    <i class="fa-solid fa-list-check"></i><span>Danh Mục Trạng Thái</span>
+                </button>
+            </nav>
+
+            <!-- User Auth Bar -->
+            <div class="flex items-center space-x-3">
+                <div id="user-info" class="hidden items-center space-x-2 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
+                    <i class="fa-solid fa-user-circle text-blue-400 text-lg"></i>
+                    <span id="user-name-display" class="text-xs font-semibold text-slate-200">User</span>
+                    <span id="user-role-badge" class="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-blue-900 text-blue-300">ROLE</span>
+                    <button onclick="logout()" title="Đăng xuất" class="text-slate-400 hover:text-red-400 ml-1">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
+                <button id="btn-open-login" onclick="openAuthModal('login')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition shadow">
+                    <i class="fa-solid fa-lock mr-1.5"></i>Đăng Nhập / Đăng Ký
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- Notification Banner Toast -->
+        <div id="toast-container" class="fixed bottom-5 right-5 z-50 space-y-2"></div>
+
+        <!-- TAB 1: TRA CỨU VẬN ĐƠN (PUBLIC TRACKING PORTAL) -->
+        <section id="tab-tracking" class="space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+                <div class="max-w-3xl mx-auto text-center space-y-3 mb-6">
+                    <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900">Tra Cứu Lịch Trình Vận Đơn</h1>
+                    <p class="text-sm text-gray-500">Mô phỏng hệ thống tra cứu J&T Express — Kiểm tra chính xác vị trí & lịch trình kiện hàng của bạn</p>
+                </div>
+
+                <!-- Search Input Form -->
+                <div class="max-w-2xl mx-auto bg-gray-50 p-4 sm:p-6 rounded-xl border border-gray-200 space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Mã Vận Đơn (Tracking Code):</label>
+                        <div class="relative">
+                            <input type="text" id="track-code-input" placeholder="Ví dụ: VN260928123456 (Hoặc nhập nhiều mã phân cách bằng dấu phẩy)"
+                                class="w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-lg text-sm font-semibold uppercase text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <i class="fa-solid fa-barcode absolute left-3.5 top-3.5 text-gray-400 text-base"></i>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-3">
+                        <div class="w-full sm:w-1/2">
+                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">4 Số Cuối SĐT (Xác Thực PII):</label>
+                            <div class="relative">
+                                <input type="text" id="track-phone-input" maxlength="4" placeholder="VD: 5678 (Tùy chọn xem tên/địa chỉ)"
+                                    class="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                <i class="fa-solid fa-phone absolute left-3 top-3 text-gray-400 text-xs"></i>
+                            </div>
+                        </div>
+                        <div class="w-full sm:w-1/2 sm:self-end">
+                            <button onclick="doTracking()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-lg transition shadow-md flex items-center justify-center space-x-2">
+                                <i class="fa-solid fa-magnifying-glass"></i><span>Tra Cứu Ngay</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="text-[11px] text-gray-500 flex items-center space-x-1">
+                        <i class="fa-solid fa-shield-halved text-blue-500"></i>
+                        <span>Bảo mật: Nhập 4 số cuối SĐT người gửi/nhận để xem đầy đủ tên & địa chỉ nhà. Nếu không nhập, thông tin cá nhân sẽ được ẩn mã hóa.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tracking Results Area -->
+            <div id="tracking-result-area" class="hidden space-y-6">
+                <!-- Overview Header Card -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-gray-100 gap-4">
+                        <div>
+                            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Mã Vận Đơn Tra Cứu</span>
+                            <h2 id="res-tracking-code" class="text-2xl font-black text-gray-900 tracking-tight">VN----------------</h2>
+                            <p class="text-xs text-gray-500 mt-0.5">Khởi tạo lúc: <span id="res-created-at">--/--/---- --:--</span></p>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <div id="res-status-badge" class="px-4 py-2 rounded-xl text-sm font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                                Đang tải...
+                            </div>
+                            <div id="res-security-badge" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600">
+                                <i class="fa-solid fa-eye-slash mr-1"></i>Chưa xác thực PII
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sender & Receiver Information -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
+                        <!-- Sender Box -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
+                            <div class="flex items-center space-x-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                <i class="fa-solid fa-user-ninja text-blue-600"></i><span>Bên Gửi (Sender)</span>
+                            </div>
+                            <p class="font-bold text-gray-900 text-base" id="res-sender-name">***</p>
+                            <p class="text-xs text-gray-600"><i class="fa-solid fa-phone mr-1 text-gray-400"></i><span id="res-sender-phone">***</span></p>
+                            <p class="text-xs text-gray-600"><i class="fa-solid fa-location-dot mr-1 text-gray-400"></i><span id="res-sender-addr">***</span></p>
+                        </div>
+                        <!-- Receiver Box -->
+                        <div class="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-2">
+                            <div class="flex items-center space-x-2 text-xs font-bold text-blue-600 uppercase tracking-wider">
+                                <i class="fa-solid fa-box-open text-blue-600"></i><span>Bên Nhận (Receiver)</span>
+                            </div>
+                            <p class="font-bold text-gray-900 text-base" id="res-receiver-name">***</p>
+                            <p class="text-xs text-gray-600"><i class="fa-solid fa-phone mr-1 text-gray-400"></i><span id="res-receiver-phone">***</span></p>
+                            <p class="text-xs text-gray-600"><i class="fa-solid fa-location-dot mr-1 text-gray-400"></i><span id="res-receiver-addr">***</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Timeline History Card -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+                    <h3 class="text-lg font-bold text-gray-900 mb-6 flex items-center space-x-2">
+                        <i class="fa-solid fa-timeline text-blue-600"></i><span>Lịch Sử Di Chuyển (Timeline Tracking)</span>
+                    </h3>
+                    
+                    <div id="res-timeline-container" class="relative border-l-2 border-blue-200 ml-4 space-y-8 py-2">
+                        <!-- Timeline items rendered dynamically -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: TẠO & QUẢN LÝ ĐƠN HÀNG (ORDER MANAGEMENT) -->
+        <section id="tab-orders" class="hidden space-y-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Quản Lý & Tạo Đơn Hàng</h1>
+                    <p class="text-xs text-gray-500">Tạo mới vận đơn logistics và in nhãn barcode</p>
+                </div>
+                <button onclick="document.getElementById('form-create-order').scrollIntoView({behavior: 'smooth'})" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow">
+                    <i class="fa-solid fa-plus mr-1"></i>Tạo Đơn Hàng Mới
+                </button>
+            </div>
+
+            <!-- Create Order Form -->
+            <div id="form-create-order" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+                <h2 class="text-lg font-bold text-gray-900 mb-6 pb-3 border-b border-gray-100 flex items-center space-x-2">
+                    <i class="fa-solid fa-file-circle-plus text-blue-600"></i><span>Tạo Vận Đơn Mới</span>
+                </h2>
+
+                <form onsubmit="handleCreateShipment(event)" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- SENDER SECTION -->
+                        <div class="space-y-3 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                            <h3 class="text-xs font-bold text-gray-700 uppercase">Thông Tin Người Gửi</h3>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600">Họ tên người gửi *</label>
+                                <input type="text" id="create-sender-name" required value="Shop Thời Trang ABC" class="w-full p-2 bg-white border border-gray-300 rounded text-sm mt-1">
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600">SĐT người gửi *</label>
+                                    <input type="text" id="create-sender-phone" required value="0912345678" class="w-full p-2 bg-white border border-gray-300 rounded text-sm mt-1">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600">Tỉnh/Thành gửi *</label>
+                                    <input type="text" id="create-sender-province" required value="TP. Hồ Chí Minh" class="w-full p-2 bg-white border border-gray-300 rounded text-sm mt-1">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600">Quận/Huyện gửi *</label>
+                                    <input type="text" id="create-sender-district" required value="Quận 1" class="w-full p-2 bg-white border border-gray-300 rounded text-sm mt-1">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600">Địa chỉ chi tiết *</label>
+                                    <input type="text" id="create-sender-address" required value="123 Đường Lê Lợi, Phường Bến Nghé" class="w-full p-2 bg-white border border-gray-300 rounded text-sm mt-1">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- RECEIVER SECTION -->
+                        <div class="space-y-3 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                            <h3 class="text-xs font-bold text-blue-700 uppercase">Thông Tin Người Nhận</h3>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600">Họ tên người nhận *</label>
+                                <input type="text" id="create-receiver-name" required value="Nguyễn Văn Nhận" class="w-full p-2 bg-white border border-gray-300 rounded text-sm mt-1">
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600">SĐT người nhận *</label>
+                                    <input type="text" id="create-receiver-phone" required value="0987654321" class="w-full p-2 bg-white border border-gray-300 rounded text-sm mt-1">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600">Tỉnh/Thành nhận *</label>
+                                    <input type="text" id="create-receiver-province" required value="Hà Nội" class="w-full p-2 bg-white border border-gray-300 rounded text-sm mt-1">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600">Quận/Huyện nhận *</label>
+                                    <input type="text" id="create-receiver-district" required value="Quận Cầu Giấy" class="w-full p-2 bg-white border border-gray-300 rounded text-sm mt-1">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600">Địa chỉ chi tiết *</label>
+                                    <input type="text" id="create-receiver-address" required value="456 Đường Cầu Giấy" class="w-full p-2 bg-white border border-gray-300 rounded text-sm mt-1">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PACKAGE & FINANCIAL SPECS -->
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600">Trọng lượng (kg) *</label>
+                            <input type="number" step="0.1" id="create-weight" required value="1.5" class="w-full p-2 bg-white border border-gray-300 rounded text-sm mt-1">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600">Tiền Thu Hộ COD (VNĐ)</label>
+                            <input type="number" id="create-cod" value="350000" class="w-full p-2 bg-white border border-gray-300 rounded text-sm mt-1">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600">Cước Phí Vận Chuyển (VNĐ) *</label>
+                            <input type="number" id="create-fee" required value="30000" class="w-full p-2 bg-white border border-gray-300 rounded text-sm mt-1">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600">Ghi chú hàng hóa</label>
+                            <input type="text" id="create-note" value="Hàng dễ vỡ, xin nhẹ tay" class="w-full p-2 bg-white border border-gray-300 rounded text-sm mt-1">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition shadow-md flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-paper-plane"></i><span>Tạo Vận Đơn Ngay (Sinh Mã Tự Động)</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Shipments List Table -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-base font-bold text-gray-900">Danh Sách Vận Đơn Trong Hệ Thống</h3>
+                    <button onclick="loadAllShipments()" class="text-xs text-blue-600 hover:underline font-semibold">
+                        <i class="fa-solid fa-rotate mr-1"></i>Làm mới
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold uppercase">
+                                <th class="p-3">Mã Vận Đơn</th>
+                                <th class="p-3">Người Gửi</th>
+                                <th class="p-3">Người Nhận</th>
+                                <th class="p-3">Trạng Thái</th>
+                                <th class="p-3">COD / Cước</th>
+                                <th class="p-3">Ngày Tạo</th>
+                                <th class="p-3">Thao Tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="shipments-table-body" class="divide-y divide-gray-100 font-medium text-gray-700">
+                            <!-- Rows rendered dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: SHIPPER & HUB STATION OPERATIONS -->
+        <section id="tab-shipper" class="hidden space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 max-w-3xl mx-auto space-y-6">
+                <div class="border-b border-gray-100 pb-4">
+                    <h1 class="text-xl font-bold text-gray-900 flex items-center space-x-2">
+                        <i class="fa-solid fa-truck-ramp-box text-blue-600"></i><span>Cập Nhật Trạng Thái Vận Chuyển (Kho / Shipper)</span>
+                    </h1>
+                    <p class="text-xs text-gray-500 mt-1">Cập nhật mốc timeline mới vào lịch sử đơn hàng (Nguyên tắc Append-Only)</p>
+                </div>
+
+                <form onsubmit="handleUpdateStatus(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Mã Vận Đơn *</label>
+                        <input type="text" id="update-status-code-input" required placeholder="Nhập mã vận đơn (VD: VN260928...)"
+                            class="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg text-sm font-semibold uppercase text-gray-900">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Trạng Thái Mới *</label>
+                        <select id="update-status-select" required class="w-full p-3 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-900">
+                            <!-- Options populated dynamically -->
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Ghi Chú Vận Hành</label>
+                        <textarea id="update-status-note" rows="2" placeholder="Ví dụ: Đã nhập kho phân loại Tân Bình / Giao hàng thành công cho anh A..."
+                            class="w-full p-3 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition shadow flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-check-double"></i><span>Cập Nhật Mốc Trạng Thái Ngay</span>
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- TAB 4: MASTER STATUS CODES -->
+        <section id="tab-master" class="hidden space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+                <h1 class="text-xl font-bold text-gray-900 mb-4">Danh Mục 12 Trạng Thái Vận Đơn Mẫu</h1>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4" id="master-status-grid">
+                    <!-- Status items rendered dynamically -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-400 py-6 border-t border-slate-800 text-xs text-center">
+        <p>Hệ Thống Tra Cứu & Theo Dõi Vận Đơn — Antigravity Assistant 2026</p>
+    </footer>
+
+    <!-- AUTH MODAL (LOGIN / REGISTER) -->
+    <div id="auth-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative">
+            <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+
+            <!-- Login Form -->
+            <div id="modal-login-content" class="space-y-4">
+                <h2 class="text-xl font-bold text-gray-900">Đăng Nhập Hệ Thống</h2>
+                
+                <!-- Quick Demo Login Buttons -->
+                <div class="bg-blue-50 p-3 rounded-lg border border-blue-100 space-y-2">
+                    <p class="text-[11px] font-bold text-blue-800 uppercase">⚡ Đăng nhập mẫu 1-Click:</p>
+                    <div class="grid grid-cols-3 gap-1.5 text-[10px]">
+                        <button onclick="quickLogin('0999999999', 'admin123')" class="bg-blue-600 text-white font-bold py-1 px-2 rounded hover:bg-blue-700">👑 Admin</button>
+                        <button onclick="quickLogin('0988888888', 'shipper123')" class="bg-blue-600 text-white font-bold py-1 px-2 rounded hover:bg-blue-700">🚚 Shipper</button>
+                        <button onclick="quickLogin('0977777777', 'customer123')" class="bg-blue-600 text-white font-bold py-1 px-2 rounded hover:bg-blue-700">👤 Khách Hàng</button>
+                    </div>
+                </div>
+
+                <form onsubmit="handleLogin(event)" class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600">SĐT hoặc Email</label>
+                        <input type="text" id="login-phone" required class="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm mt-1">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600">Mật khẩu</label>
+                        <input type="password" id="login-password" required class="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm mt-1">
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-sm transition">Đăng Nhập</button>
+                </form>
+                <div class="text-xs text-center text-gray-500 pt-2 border-t">
+                    Chưa có tài khoản? <a href="#" onclick="openAuthModal('register')" class="text-blue-600 font-bold hover:underline">Đăng ký ngay</a>
+                </div>
+            </div>
+
+            <!-- Register Form -->
+            <div id="modal-register-content" class="hidden space-y-4">
+                <h2 class="text-xl font-bold text-gray-900">Đăng Ký Tài Khoản Mới</h2>
+                <form onsubmit="handleRegister(event)" class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600">Họ và Tên *</label>
+                        <input type="text" id="reg-name" required class="w-full p-2 bg-gray-50 border border-gray-300 rounded text-sm mt-1">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600">Số điện thoại *</label>
+                        <input type="text" id="reg-phone" required class="w-full p-2 bg-gray-50 border border-gray-300 rounded text-sm mt-1">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600">Mật khẩu *</label>
+                        <input type="password" id="reg-pass" required class="w-full p-2 bg-gray-50 border border-gray-300 rounded text-sm mt-1">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600">Vai trò (Role) *</label>
+                        <select id="reg-role" class="w-full p-2 bg-gray-50 border border-gray-300 rounded text-sm mt-1">
+                            <option value="CUSTOMER">Khách Hàng (CUSTOMER)</option>
+                            <option value="SHIPPER">Shipper / Tài Xế (SHIPPER)</option>
+                            <option value="WAREHOUSE_STAFF">Nhân Viên Kho (WAREHOUSE_STAFF)</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-sm transition">Tạo Tài Khoản</button>
+                </form>
+                <div class="text-xs text-center text-gray-500 pt-2 border-t">
+                    Đã có tài khoản? <a href="#" onclick="openAuthModal('login')" class="text-blue-600 font-bold hover:underline">Đăng nhập</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        const API_BASE = '/api/v1';
+        let currentUser = null;
+        let masterStatusCodes = [];
+
+        // App Initialization
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuthToken();
+            loadMasterStatusCodes();
+        });
+
+        // Tab Switching Logic
+        function switchTab(tabName) {
+            ['tracking', 'orders', 'shipper', 'master'].forEach(t => {
+                document.getElementById(`tab-${t}`).classList.add('hidden');
+                const navBtn = document.getElementById(`nav-${t}`);
+                if (navBtn) {
+                    navBtn.className = 'px-4 py-2 rounded-md transition flex items-center space-x-2 text-slate-300 hover:text-white hover:bg-slate-800';
+                }
+            });
+
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`nav-${tabName}`);
+            if (activeBtn) {
+                activeBtn.className = 'px-4 py-2 rounded-md transition flex items-center space-x-2 bg-blue-600 text-white font-bold shadow';
+            }
+
+            if (tabName === 'orders') loadAllShipments();
+        }
+
+        // Public Tracking Request
+        async function doTracking() {
+            const codeInput = document.getElementById('track-code-input').value.trim();
+            const phone4 = document.getElementById('track-phone-input').value.trim();
+
+            if (!codeInput) {
+                showToast('Vui lòng nhập mã vận đơn!', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/tracking/${encodeURIComponent(codeInput)}?phoneLast4=${encodeURIComponent(phone4)}`);
+                const data = await res.json();
+
+                if (res.ok && data.data) {
+                    renderTrackingResult(data.data);
+                    showToast('Lấy thông tin tra cứu thành công!', 'success');
+                } else {
+                    showToast(data.message || 'Không tìm thấy vận đơn!', 'error');
+                }
+            } catch (err) {
+                showToast('Lỗi kết nối máy chủ!', 'error');
+            }
+        }
+
+        function renderTrackingResult(info) {
+            document.getElementById('tracking-result-area').classList.remove('hidden');
+            document.getElementById('res-tracking-code').innerText = info.trackingCode;
+            document.getElementById('res-created-at').innerText = info.createdAt ? new Date(info.createdAt).toLocaleString('vi-VN') : '--';
+            document.getElementById('res-status-badge').innerText = info.currentStatusNameVi || info.currentStatusCode;
+            
+            // Security PII badge
+            const secBadge = document.getElementById('res-security-badge');
+            if (info.verified) {
+                secBadge.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-green-100 text-green-700 border border-green-200';
+                secBadge.innerHTML = '<i class="fa-solid fa-lock-open mr-1"></i>Đã xác thực PII';
+            } else {
+                secBadge.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200';
+                secBadge.innerHTML = '<i class="fa-solid fa-lock mr-1"></i>Chưa xác thực PII (Đã mã hóa)';
+            }
+
+            // Sender & Receiver
+            document.getElementById('res-sender-name').innerText = info.senderName || '***';
+            document.getElementById('res-sender-phone').innerText = info.senderPhone || '***';
+            document.getElementById('res-sender-addr').innerText = `${info.senderAddress || '***'}, ${info.senderDistrict || ''}, ${info.senderProvince || ''}`;
+
+            document.getElementById('res-receiver-name').innerText = info.receiverName || '***';
+            document.getElementById('res-receiver-phone').innerText = info.receiverPhone || '***';
+            document.getElementById('res-receiver-addr').innerText = `${info.receiverAddress || '***'}, ${info.receiverDistrict || ''}, ${info.receiverProvince || ''}`;
+
+            // Timeline items
+            const container = document.getElementById('res-timeline-container');
+            container.innerHTML = '';
+
+            if (info.timeline && info.timeline.length > 0) {
+                info.timeline.forEach((item, index) => {
+                    const isLatest = index === info.timeline.length - 1;
+                    const itemEl = document.createElement('div');
+                    itemEl.className = 'relative pl-6';
+                    itemEl.innerHTML = `
+                        <div class="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full ${isLatest ? 'bg-blue-600 ring-4 ring-blue-100' : 'bg-gray-300'}"></div>
+                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-sm text-gray-900">${item.statusNameVi || item.statusCode}</span>
+                                <span class="text-[11px] font-semibold text-gray-400">${new Date(item.createdAt).toLocaleString('vi-VN')}</span>
+                            </div>
+                            ${item.note ? `<p class="text-xs text-gray-600 mt-1"><i class="fa-solid fa-circle-info mr-1 text-blue-500"></i>${item.note}</p>` : ''}
+                        </div>
+                    `;
+                    container.appendChild(itemEl);
+                });
+            }
+        }
+
+        // Create Shipment
+        async function handleCreateShipment(e) {
+            e.preventDefault();
+            const token = localStorage.getItem('jwt_token');
+
+            const payload = {
+                senderName: document.getElementById('create-sender-name').value,
+                senderPhone: document.getElementById('create-sender-phone').value,
+                senderProvince: document.getElementById('create-sender-province').value,
+                senderDistrict: document.getElementById('create-sender-district').value,
+                senderAddress: document.getElementById('create-sender-address').value,
+                receiverName: document.getElementById('create-receiver-name').value,
+                receiverPhone: document.getElementById('create-receiver-phone').value,
+                receiverProvince: document.getElementById('create-receiver-province').value,
+                receiverDistrict: document.getElementById('create-receiver-district').value,
+                receiverAddress: document.getElementById('create-receiver-address').value,
+                weightKg: parseFloat(document.getElementById('create-weight').value),
+                codAmount: parseFloat(document.getElementById('create-cod').value || 0),
+                shippingFee: parseFloat(document.getElementById('create-fee').value),
+                itemNote: document.getElementById('create-note').value
+            };
+
+            try {
+                const res = await fetch(`${API_BASE}/shipments`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    showToast(`Tạo vận đơn thành công! Mã: ${data.data.trackingCode}`, 'success');
+                    loadAllShipments();
+                    // Switch to tracking tab automatically
+                    document.getElementById('track-code-input').value = data.data.trackingCode;
+                    switchTab('tracking');
+                    doTracking();
+                } else {
+                    showToast(data.message || 'Lỗi khi tạo vận đơn', 'error');
+                }
+            } catch (err) {
+                showToast('Lỗi kết nối API!', 'error');
+            }
+        }
+
+        // Load All Shipments Table
+        async function loadAllShipments() {
+            const token = localStorage.getItem('jwt_token');
+            try {
+                const res = await fetch(`${API_BASE}/shipments`, {
+                    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                });
+                const data = await res.json();
+
+                const tbody = document.getElementById('shipments-table-body');
+                tbody.innerHTML = '';
+
+                if (res.ok && data.data) {
+                    data.data.forEach(item => {
+                        const tr = document.createElement('tr');
+                        tr.className = 'hover:bg-gray-50';
+                        tr.innerHTML = `
+                            <td class="p-3 font-bold text-blue-600">${item.trackingCode}</td>
+                            <td class="p-3">${item.senderName}<br><span class="text-[10px] text-gray-400">${item.senderPhone}</span></td>
+                            <td class="p-3">${item.receiverName}<br><span class="text-[10px] text-gray-400">${item.receiverPhone}</span></td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded bg-blue-100 text-blue-700 font-bold">${item.currentStatusCode}</span></td>
+                            <td class="p-3">COD: ${item.codAmount ? item.codAmount.toLocaleString('vi-VN') : 0}đ<br><span class="text-[10px] text-gray-400">Cước: ${item.shippingFee ? item.shippingFee.toLocaleString('vi-VN') : 0}đ</span></td>
+                            <td class="p-3 text-gray-400">${new Date(item.createdAt).toLocaleDateString('vi-VN')}</td>
+                            <td class="p-3">
+                                <button onclick="quickTrack('${item.trackingCode}')" class="bg-blue-600 text-white text-[10px] font-bold px-2.5 py-1 rounded hover:bg-blue-700">Tra cứu</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function quickTrack(code) {
+            document.getElementById('track-code-input').value = code;
+            switchTab('tracking');
+            doTracking();
+        }
+
+        // Update Shipment Status
+        async function handleUpdateStatus(e) {
+            e.preventDefault();
+            const token = localStorage.getItem('jwt_token');
+
+            const payload = {
+                trackingCode: document.getElementById('update-status-code-input').value.trim(),
+                statusCode: document.getElementById('update-status-select').value,
+                note: document.getElementById('update-status-note').value
+            };
+
+            try {
+                const res = await fetch(`${API_BASE}/shipments/status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    showToast('Cập nhật mốc trạng thái thành công!', 'success');
+                    quickTrack(payload.trackingCode);
+                } else {
+                    showToast(data.message || 'Cập nhật thất bại!', 'error');
+                }
+            } catch (err) {
+                showToast('Lỗi kết nối API!', 'error');
+            }
+        }
+
+        // Master Status Codes Load
+        async function loadMasterStatusCodes() {
+            try {
+                const res = await fetch(`${API_BASE}/status-codes`);
+                const data = await res.json();
+                if (res.ok && data.data) {
+                    masterStatusCodes = data.data;
+
+                    const select = document.getElementById('update-status-select');
+                    const grid = document.getElementById('master-status-grid');
+                    select.innerHTML = '';
+                    grid.innerHTML = '';
+
+                    masterStatusCodes.forEach(st => {
+                        const opt = document.createElement('option');
+                        opt.value = st.code;
+                        opt.innerText = `[${st.code}] - ${st.nameVi}`;
+                        select.appendChild(opt);
+
+                        const card = document.createElement('div');
+                        card.className = 'bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-1';
+                        card.innerHTML = `
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-xs text-blue-600">${st.code}</span>
+                                ${st.isFinal ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-green-100 text-green-700">FINAL</span>' : ''}
+                            </div>
+                            <p class="font-bold text-sm text-gray-900">${st.nameVi}</p>
+                            <p class="text-xs text-gray-500">${st.nameEn}</p>
+                        `;
+                        grid.appendChild(card);
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Authentication Handlers
+        async function handleLogin(e) {
+            e.preventDefault();
+            const phone = document.getElementById('login-phone').value;
+            const pass = document.getElementById('login-password').value;
+            await quickLogin(phone, pass);
+        }
+
+        async function quickLogin(phone, pass) {
+            try {
+                const res = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phoneOrEmail: phone, password: pass })
+                });
+                const data = await res.json();
+
+                if (res.ok && data.data) {
+                    localStorage.setItem('jwt_token', data.data.accessToken);
+                    currentUser = data.data;
+                    updateUserUI();
+                    closeAuthModal();
+                    showToast(`Xin chào ${data.data.fullName}! (Quyền: ${data.data.role})`, 'success');
+                } else {
+                    showToast(data.message || 'Đăng nhập thất bại!', 'error');
+                }
+            } catch (err) {
+                showToast('Lỗi kết nối máy chủ!', 'error');
+            }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const payload = {
+                fullName: document.getElementById('reg-name').value,
+                phone: document.getElementById('reg-phone').value,
+                password: document.getElementById('reg-pass').value,
+                role: document.getElementById('reg-role').value
+            };
+
+            try {
+                const res = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (res.ok && data.data) {
+                    localStorage.setItem('jwt_token', data.data.accessToken);
+                    currentUser = data.data;
+                    updateUserUI();
+                    closeAuthModal();
+                    showToast('Đăng ký thành công!', 'success');
+                } else {
+                    showToast(data.message || 'Đăng ký thất bại!', 'error');
+                }
+            } catch (err) {
+                showToast('Lỗi kết nối API!', 'error');
+            }
+        }
+
+        async function checkAuthToken() {
+            const token = localStorage.getItem('jwt_token');
+            if (!token) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (res.ok && data.data) {
+                    currentUser = data.data;
+                    updateUserUI();
+                } else {
+                    logout();
+                }
+            } catch (err) {
+                logout();
+            }
+        }
+
+        function updateUserUI() {
+            if (currentUser) {
+                document.getElementById('btn-open-login').classList.add('hidden');
+                document.getElementById('user-info').classList.remove('hidden');
+                document.getElementById('user-info').classList.add('flex');
+                document.getElementById('user-name-display').innerText = currentUser.fullName;
+                document.getElementById('user-role-badge').innerText = currentUser.role;
+            } else {
+                document.getElementById('btn-open-login').classList.remove('hidden');
+                document.getElementById('user-info').classList.add('hidden');
+                document.getElementById('user-info').classList.remove('flex');
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('jwt_token');
+            currentUser = null;
+            updateUserUI();
+            showToast('Đã đăng xuất', 'info');
+        }
+
+        function openAuthModal(mode) {
+            document.getElementById('auth-modal').classList.remove('hidden');
+            if (mode === 'login') {
+                document.getElementById('modal-login-content').classList.remove('hidden');
+                document.getElementById('modal-register-content').classList.add('hidden');
+            } else {
+                document.getElementById('modal-login-content').classList.add('hidden');
+                document.getElementById('modal-register-content').classList.remove('hidden');
+            }
+        }
+
+        function closeAuthModal() {
+            document.getElementById('auth-modal').classList.add('hidden');
+        }
+
+        function showToast(msg, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bg = type === 'success' ? 'bg-green-600' : (type === 'error' ? 'bg-red-600' : 'bg-blue-600');
+            toast.className = `${bg} text-white px-4 py-2.5 rounded-lg shadow-lg text-xs font-bold flex items-center space-x-2 transition-all transform translate-y-2 opacity-0`;
+            toast.innerHTML = `<i class="fa-solid fa-circle-info"></i><span>${msg}</span>`;
+
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+    </script>
+</body>
+</html>
